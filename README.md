@@ -1,4 +1,4 @@
-# Project annotations
+# Project notes
 
 This project uses the Go language and it's library Gin Gonic to create an API using SQLite and Swagger.
 
