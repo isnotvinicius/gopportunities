@@ -12,8 +12,6 @@ I also created the `main.go` file to initialize the main package so I could comp
 
 ## Importing external packages (Gin Gonic)
 
-Para importar uma biblioteca externa em Go, existem varias maneiras, no projeto utilizei a forma mais simples e facil.
-
 There are several ways to import an external package, I used the most simple and easier way.
 
 I added the import of the package on my `main.go` file and runned the command `go mod tidy`. This command cleans the `go.mod` file, removing all unused imports and adding imports that are being used but not declared on the `go.mod` file.
@@ -126,3 +124,10 @@ func initializeRoutes(router *gin.Engine) { // Receives the router as param and 
 	}
 }
 ```
+
+## Handlers
+
+In order to keep the routes more easily to read and indentify them, I separeted the anonymous func of the route into a handler package, which will deal with the logic for the route, separating things properly.
+
+Inside the handler package, I create multiple files one for each of the routes declared before. After that, instead of calling an anonymous function I called the function inside the handler file that corresponds to the current rout. This makes the `routes.go` file to be more readable and easy to indentify the routes.
+
