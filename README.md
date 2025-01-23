@@ -129,5 +129,5 @@ func initializeRoutes(router *gin.Engine) { // Receives the router as param and 
 
 In order to keep the routes more easily to read and indentify them, I separeted the anonymous func of the route into a handler package, which will deal with the logic for the route, separating things properly.
 
-Inside the handler package, I create multiple files one for each of the routes declared before. After that, instead of calling an anonymous function I called the function inside the handler file that corresponds to the current rout. This makes the `routes.go` file to be more readable and easy to indentify the routes.
+Inside the handler package I created multiple files, one for each of the routes declared before. After that, instead of calling an anonymous function I called the function inside the handler file that corresponds to the current route. This makes the `routes.go` file to be more readable and easy to indentify the routes.
 
