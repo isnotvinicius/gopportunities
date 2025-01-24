@@ -131,3 +131,213 @@ In order to keep the routes more easily to read and indentify them, I separeted 
 
 Inside the handler package I created multiple files, one for each of the routes declared before. After that, instead of calling an anonymous function I called the function inside the handler file that corresponds to the current route. This makes the `routes.go` file to be more readable and easy to indentify the routes.
 
+## Database
+
+This is a simple CRUD, so I need a Database. In this project I'm using `GORM` as the ORM and `SQLite` as a database.
+
+First, I installed GORM following the documentation provided by it's website.
+
+The I created the package `schemas`, where I will create all the schemas that will be used on the api. This project only has one, but I could add more by creating new files. Different from the other packages, this one won't have a `schemas.go` file, instead each schema will have a file.
+
+```
+.
+└── schemas
+    └── opening.go
+	└── other_schema.go
+	└── another_schema.go
+```
+
+The schema file will look like this:
+
+```go
+package schemas
+
+import (
+	"gorm.io/gorm"
+)
+
+type Opening struct {
+	gorm.Model
+	Role     string
+	Company  string
+	Location string
+	Remote   bool
+	Link     string
+	Salary   int64
+}
+
+```
+
+This struct created will act as a model to the database table. Same thing with other ORM's out there.
+
+## The config module
+
+In order to define some configurations of the project, I created a config package. Define the instance of the database is one of the many things this module can have. I did it by declaring a var in the package scope that receives the gorm and then a `Init()` function to initialize the config. The function for now will be empty..
+
+```go
+package config
+
+import "gorm.io/gorm"
+
+var (
+	db *gorm.DB
+)
+
+func Init() error {
+	return nil
+}
+```
+
+Before doing anything on the api, the config needs to be initialized, I did this by adding the `config.Init()` function on my main package.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/isnotvinicius/gopportunities/config"
+	"github.com/isnotvinicius/gopportunities/router"
+)
+
+func main() {
+	// Initialize configs
+	err := config.Init()
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Initialize the router package
+	router.Initialize()
+}
+```
+
+If error has any value besides `nil`, I print an error and return the `main func`.
+
+## Logger
+
+It's good to return an error message or even `panic()` if the config couldn't be initialized, but in this case I will create a logger in order to save this errors. For this, I created the logger file inside the config package. Inside the `logger.go`, I created a struct called Logger and defined all log types that the API should have.
+
+Then I created a function that receives the log prefix and return the log using a writer, the prefix and a few flags to enhace the log message.
+
+Finally I created a few functions to return the logging message with and without formating.
+
+```go
+package config
+
+import (
+	"io"
+	"log"
+)
+
+type Logger struct {
+	debug   *log.Logger
+	info    *log.Logger
+	warning *log.Logger
+	error   *log.Logger
+	writer  io.Writer
+}
+
+func NewLogger(p string) *Logger {
+	writer := io.Writer(os.Stdout)
+	logger := log.New(writer, p, log.Ldate|log.Ltime)
+
+	return &Logger{
+		debug:   log.New(writer, "DEBUG: ", logger.Flags()),
+		info:    log.New(writer, "INFO: ", logger.Flags()),
+		warning: log.New(writer, "WARNING: ", logger.Flags()),
+		err:     log.New(writer, "ERROR: ", logger.Flags()),
+		writer:  writer,
+	}
+}
+
+// Non-formatted loggers
+func (l *Logger) Debug(v ...interface{}) {
+	l.debug.Println(v...)
+}
+
+func (l *Logger) Info(v ...interface{}) {
+	l.info.Println(v...)
+}
+
+func (l *Logger) Warning(v ...interface{}) {
+	l.warning.Println(v...)
+}
+
+func (l *Logger) Error(v ...interface{}) {
+	l.err.Println(v...)
+}
+
+// Formatted loggers
+
+func (l *Logger) Debugf(format string, v ...interface{}) {
+	l.debug.Printf(format, v...)
+}
+
+func (l *Logger) Infof(format string, v ...interface{}) {
+	l.info.Printf(format, v...)
+}
+
+func (l *Logger) Warningf(format string, v ...interface{}) {
+	l.warning.Printf(format, v...)
+}
+
+func (l *Logger) Errorf(format string, v ...interface{}) {
+	l.err.Printf(format, v...)
+}
+```
+
+P.S: the parenthesis before the func name is to declare a receiver to the func we are creating. In this case I'm saying that each of the func's I created will be avaiable in the Logger struct because it's pointer is declared as the receiver of the given func. `func (variable *Struct) FuncName(params)`
+
+Now to implement the logger, we declare the logger on the main package and call a function inside config that initialize our Logger.
+
+```go
+// main.go
+package main
+
+import (
+	"github.com/isnotvinicius/gopportunities/config"
+	"github.com/isnotvinicius/gopportunities/router"
+)
+
+var (
+	logger *config.Logger
+)
+
+func main() {
+	logger = config.GetLogger("main package")
+
+	// Initialize configs
+	err := config.Init()
+
+	if err != nil {
+		logger.Errorf("config init resulted in error: %v", err)
+		return
+	}
+
+	// Initialize the router package
+	router.Initialize()
+}
+
+// config.go
+package config
+
+import "gorm.io/gorm"
+
+var (
+	db     *gorm.DB
+	logger *Logger
+)
+
+func Init() error {
+	return nil
+}
+
+func GetLogger(p string) *Logger {
+	// Initialize Logger
+	logger = NewLogger(p)
+	return logger
+}
+```
