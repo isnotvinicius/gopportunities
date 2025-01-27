@@ -447,3 +447,22 @@ func GetLogger(p string) *Logger {
 	return logger
 }
 ```
+
+## JSON Response
+
+To facilitate data manipulation, I created a struct inside my `schemas/opening.go` called `OpeningResponse` that maps all the model fields to a json correspondant, so when we retrieve data they come as a json.
+
+```go
+type OpeningResponse struct {
+	ID        uint      `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	DeletedAt time.Time `json:"deletedAt,omitempty"` // When empyt, omits it from the response
+	Role      string    `json:"role"`
+	Company   string    `json:"company"`
+	Location  string    `json:"location"`
+	Remote    bool      `json:"remote"`
+	Link      string    `json:"link"`
+	Salary    int64     `json:"salary"`
+}
+```
