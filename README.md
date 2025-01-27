@@ -341,3 +341,109 @@ func GetLogger(p string) *Logger {
 	return logger
 }
 ```
+
+## Creating and connecting to the database
+
+Inside the config package, I created a `sqlite.go` file to initialize the connection and connect to it. Just followed the [documentation](https://gorm.io/docs/) guide to connect to it and used the logger created before to display some errors (when they occur). I also added some validation for when the SQLite file does not exist, it will create automatically for me, this ensures that the api will never run without the database file being created.
+
+```go
+package config
+
+import (
+	"os"
+
+	"github.com/isnotvinicius/gopportunities/schemas"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+func InitializeSQLite() (*gorm.DB, error) {
+	logger := GetLogger("sqlite")
+
+	dbPath := "./db/main.db"
+
+	// Check if the database file exists
+	_, err := os.Stat(dbPath)
+
+	if os.IsNotExist(err) {
+		logger.Info("Database file does not exist, creating it...")
+
+		// Create the database directory
+		err = os.MkdirAll("./db", os.ModePerm)
+
+		if err != nil {
+			return nil, err
+		}
+
+		// Create the database file
+		file, err := os.Create(dbPath)
+
+		if err != nil {
+			return nil, err
+		}
+
+		// Close the file to avoid errors
+		file.Close()
+	}
+
+	// Create database and connect
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+
+	if err != nil {
+		logger.Errorf("Failed to connect to database: %v", err)
+		return nil, err
+	}
+
+	// Migrate the schema created before
+	err = db.AutoMigrate(&schemas.Opening{})
+
+	if err != nil {
+		logger.Errorf("Failed to migrate schema: %v", err)
+		return nil, err
+	}
+
+	return db, nil
+}
+
+
+```
+
+After configuring the database on the `sqlite.go` file, I added it's initialization on the `config.go` file to start the database as soon as the api starts running (because the first thing the main package does is initialize the config package).
+
+```go
+package config
+
+import (
+	"fmt"
+
+	"gorm.io/gorm"
+)
+
+var (
+	db     *gorm.DB
+	logger *Logger
+)
+
+func Init() error {
+	var err error
+
+	// Initialize the Database
+	db, err = InitializeSQLite()
+
+	if err != nil {
+		return fmt.Errorf("error initializing sqlite: %v", err)
+	}
+
+	return nil
+}
+
+func GetSQLite() *gorm.DB {
+	return db
+}
+
+func GetLogger(p string) *Logger {
+	// Initialize Logger
+	logger = NewLogger(p)
+	return logger
+}
+```
