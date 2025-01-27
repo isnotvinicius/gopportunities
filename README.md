@@ -143,8 +143,8 @@ The I created the package `schemas`, where I will create all the schemas that wi
 .
 └── schemas
     └── opening.go
-	└── other_schema.go
-	└── another_schema.go
+    └── other_schema.go
+    └── another_schema.go
 ```
 
 The schema file will look like this:
