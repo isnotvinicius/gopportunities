@@ -466,3 +466,172 @@ type OpeningResponse struct {
 	Salary    int64     `json:"salary"`
 }
 ```
+
+## Finishing the Handlers
+
+Finally, after a lot of configuration and creating things to help, I started finishing the handlers and actually creating the CRUD.
+
+Before creating the actual logic in the handlers, I added the logger and database inits on the `handler.go` file so they can be accessed on any of the handlers created. Then I initialized the handler inside the `routes.go` file.
+
+```go
+// handler/handler.go
+package handler
+
+import (
+	"github.com/isnotvinicius/gopportunities/config"
+	"gorm.io/gorm"
+)
+
+var (
+	logger *config.Logger
+	db     *gorm.DB
+)
+
+func Init() {
+	logger = config.GetLogger("handler")
+	db = config.GetSQLite()
+}
+
+// router/routes.go
+func initializeRoutes(router *gin.Engine) {
+	// Initialize handler
+	handler.Init()
+
+	v1 := router.Group("/api/v1")
+	{
+		v1.GET("/opening", handler.ShowOpeningHandler)
+
+		v1.POST("/opening", handler.PostOpeningHandler)
+
+		v1.DELETE("/opening", handler.DeleteOpeningHandler)
+
+		v1.PUT("/opening", handler.UpdateOpeningHandler)
+
+		v1.GET("/openings", handler.ListOpeningHandler)
+	}
+}
+```
+
+I created a `handler/request.go` file to manage the requests of the API. This file will have a type struct for each of the handlers (CRUD methods) to map which fields the request should receive. This would be the "equivalent" of creating a request file in Laravel and adding the field and their types there. Go will ignore fields that are sent on the request but are NOT declared on the struct being used.
+
+Besides creating the struct, I added a validation function that uses a helper to return a message when a field is empty on the request.
+
+```go
+package handler
+
+import "fmt"
+
+func errParamIsRequired(name string, typ string) error {
+	return fmt.Errorf("param: %s (type: %s) is required", name, typ)
+}
+
+// createOpening
+type CreateOpeningRequest struct {
+	Role     string `json:"role"`
+	Company  string `json:"company"`
+	Location string `json:"location"`
+	Remote   *bool  `json:"remote"`
+	Link     string `json:"link"`
+	Salary   int64  `json:"salary"`
+}
+
+func (r *CreateOpeningRequest) Validate() error {
+	if r.Role == "" {
+		return errParamIsRequired("role", "string")
+	}
+
+	if r.Company == "" {
+		return errParamIsRequired("company", "string")
+	}
+
+	if r.Location == "" {
+		return errParamIsRequired("location", "string")
+	}
+
+	if r.Remote == nil {
+		return errParamIsRequired("remote", "bool")
+	}
+
+	if r.Link == "" {
+		return errParamIsRequired("link", "string")
+	}
+
+	if r.Salary == 0 {
+		return errParamIsRequired("salary", "int")
+	}
+
+	return nil
+}
+```
+
+Then on the `handler/createOpening.go` file, I just create a request variable and initialize it with the struct I just created. Using the request variable to store data will ensure that ONLY the fields declared on the struct will be used, any additional fields will be simply ignored. I binded the json of the request to the request variable and used the `Validate()` to check if data sent is correct before storing it in the database.
+
+```go
+package handler
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+func PostOpeningHandler(ctx *gin.Context) {
+	// Initialize request with data from the body mapped by the struct
+	request := CreateOpeningRequest{}
+
+	// bind the JSON body to the request variable using gin context
+	ctx.BindJSON(&request)
+
+	// Validate the request
+	// Declares err and do request.Validate(), if err is not nil I log the error. Common syntax in Go.
+	if err := request.Validate(); err != nil {
+		logger.Errorf("validation error: %v", err.Error())
+		return
+	}
+
+	if err := db.Create(&request).Error; err != nil {
+		logger.Errorf("error creating opening: %v", err.Error())
+		return
+	}
+}
+```
+
+To manage the response and sanitize it, I created a `handler/response.go` file. Inside it, a `sendError()` function was declared and it uses the gin context to return the error response, just like the documentation of Gin Gonic says but in a way that all handlers can use it.
+
+```go
+package handler
+
+import "github.com/gin-gonic/gin"
+
+func sendError(ctx *gin.Context, code int, message string) {
+	ctx.JSON(code, gin.H{
+		"message": message,
+		"status":  code,
+	})
+}
+```
+
+Then I can just call it using `sendError(ctx, http.StatusBadRequest, err.Error())` for example.
+
+```go
+package handler
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+func PostOpeningHandler(ctx *gin.Context) {
+	// Initialize request with data from the body mapped by the struct
+	request := CreateOpeningRequest{}
+
+	// bind the JSON body to the request variable using gin context
+	ctx.BindJSON(&request)
+
+	// Validate the request
+	if err := request.Validate(); err != nil {
+		logger.Errorf("validation error: %v", err.Error())
+		sendError(ctx, http.StatusBadRequest, err.Error()) // Function of the response.go file
+		return
+	}
+}
+```
