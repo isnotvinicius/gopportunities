@@ -740,3 +740,143 @@ func ListOpeningHandler(ctx *gin.Context) {
 }
 
 ```
+
+### Show Opening
+
+Basically delete logic, without deleting it. Pretty straight forward.
+
+```go
+package handler
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/isnotvinicius/gopportunities/schemas"
+)
+
+func ShowOpeningHandler(ctx *gin.Context) {
+	// Get the id from the query parameters and validates it
+	id := ctx.Query("id")
+
+	if id == "" {
+		sendError(ctx, http.StatusBadRequest, errParamIsRequired("id", "queryParameter").Error())
+		return
+	}
+
+	opening := schemas.Opening{}
+
+	// Find the opening and send an error when not found
+	if err := db.First(&opening, id).Error; err != nil {
+		sendError(ctx, http.StatusNotFound, fmt.Sprintf("opening with id %s not found", id))
+		return
+	}
+
+	sendSuccess(ctx, "show-opening", opening)
+}
+
+```
+
+### Update Opening
+
+Update follows the logic of create, but we unify it with the find (so we can update). So I created the validation for the update handler, which consists in validating if any field was sent in the request in my `request.go` file.
+
+```go
+// Update opening
+type UpdateOpeningRequest struct {
+	Role     string `json:"role"`
+	Company  string `json:"company"`
+	Location string `json:"location"`
+	Remote   *bool  `json:"remote"`
+	Link     string `json:"link"`
+	Salary   int64  `json:"salary"`
+}
+
+func (r *UpdateOpeningRequest) Validate() error {
+	// If any field is provided, validation is truthy
+	if r.Role != "" || r.Company != "" || r.Location != "" || r.Remote != nil || r.Link != "" || r.Salary > 0 {
+		return nil
+	}
+
+	// if none of the fields are provided, return false
+	return fmt.Errorf("at least one valid field is required")
+}
+```
+
+Then the logic to update is basically retrieve the request, find the opening, map the struct with the incoming request and then save it on the database.
+
+```go
+package handler
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/isnotvinicius/gopportunities/schemas"
+)
+
+func UpdateOpeningHandler(ctx *gin.Context) {
+	request := UpdateOpeningRequest{}
+
+	ctx.BindJSON(&request)
+
+	if err := request.Validate(); err != nil {
+		logger.Errorf("validation error: %v", err)
+		sendError(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Get the id from the query parameters and validates it
+	id := ctx.Query("id")
+
+	if id == "" {
+		sendError(ctx, http.StatusBadRequest, errParamIsRequired("id", "queryParameter").Error())
+		return
+	}
+
+	opening := schemas.Opening{}
+
+	// Find the opening and send an error when not found
+	if err := db.First(&opening, id).Error; err != nil {
+		sendError(ctx, http.StatusNotFound, fmt.Sprintf("opening with id %s not found", id))
+		return
+	}
+
+	// Update opening struct with the incoming request
+	if request.Role != "" {
+		opening.Role = request.Role
+	}
+
+	if request.Company != "" {
+		opening.Company = request.Company
+	}
+
+	if request.Location != "" {
+		opening.Location = request.Location
+	}
+
+	if request.Remote != nil {
+		opening.Remote = *request.Remote
+	}
+
+	if request.Link != "" {
+		opening.Link = request.Link
+	}
+
+	if request.Salary > 0 {
+		opening.Salary = request.Salary
+	}
+
+	// Save the opening
+	if err := db.Save(&opening).Error; err != nil {
+		sendError(ctx, http.StatusInternalServerError, "error updating opening")
+		return
+	}
+
+	sendSuccess(ctx, "update-opening", opening)
+}
+```
+
+With this the handlers are all created and the API is fully operational.

@@ -8,6 +8,7 @@ import (
 )
 
 func ListOpeningHandler(ctx *gin.Context) {
+	// Get all openings from database (the [] is to make it an empty array so it can retrieve all)
 	openings := []schemas.Opening{}
 
 	if err := db.Find(&openings).Error; err != nil {
