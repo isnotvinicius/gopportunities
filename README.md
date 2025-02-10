@@ -469,6 +469,8 @@ type OpeningResponse struct {
 
 ## Finishing the Handlers
 
+### Create Opening
+
 Finally, after a lot of configuration and creating things to help, I started finishing the handlers and actually creating the CRUD.
 
 Before creating the actual logic in the handlers, I added the logger and database inits on the `handler.go` file so they can be accessed on any of the handlers created. Then I initialized the handler inside the `routes.go` file.
@@ -667,5 +669,47 @@ func PostOpeningHandler(ctx *gin.Context) {
 	}
 
 	sendSuccess(ctx, "create-opening", opening)
+}
+```
+
+### Delete Opening
+
+The rest of the handlers were easy to implement, just needed to follow the logic behind the create and adapt according to the operation being executed at the time. For delete I just needed to retrieve the id on the queryParam, find the opening and then delete it, always checking for errors and logging them.
+
+```go
+package handler
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/isnotvinicius/gopportunities/schemas"
+)
+
+func DeleteOpeningHandler(ctx *gin.Context) {
+	// Get the id from the query parameters and validates it
+	id := ctx.Query("id")
+
+	if id == "" {
+		sendError(ctx, http.StatusBadRequest, errParamIsRequired("id", "queryParameter").Error())
+		return
+	}
+
+	opening := schemas.Opening{}
+
+	// Find the opening and send an error when not found
+	if err := db.First(&opening, id).Error; err != nil {
+		sendError(ctx, http.StatusNotFound, fmt.Sprintf("opening with id %s not found", id))
+		return
+	}
+
+	// Deletes the opening
+	if err := db.Delete(&opening).Error; err != nil {
+		sendError(ctx, http.StatusInternalServerError, fmt.Sprintf("error while deleting opening with id %s on database", id))
+		return
+	}
+
+	sendSuccess(ctx, "delete-opening", opening)
 }
 ```
