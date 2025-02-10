@@ -594,23 +594,37 @@ func PostOpeningHandler(ctx *gin.Context) {
 }
 ```
 
-To manage the response and sanitize it, I created a `handler/response.go` file. Inside it, a `sendError()` function was declared and it uses the gin context to return the error response, just like the documentation of Gin Gonic says but in a way that all handlers can use it.
+To manage the response and sanitize it, I created a `handler/response.go` file. Inside it, a `sendError()` function was declared and it uses the gin context to return the error response, just like the documentation of Gin Gonic says but in a way that all handlers can use it. I also created a `sendSucess()` function to return the response in a success case with the headers and the body content.
 
 ```go
 package handler
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+
+	"fmt"
+
+	"net/http"
+)
 
 func sendError(ctx *gin.Context, code int, message string) {
+	ctx.Header("Content-type", "application/json")
 	ctx.JSON(code, gin.H{
 		"message": message,
 		"status":  code,
 	})
 }
+
+func sendSuccess(ctx *gin.Context, op string, data interface{}) {
+	ctx.Header("Content-type", "application/json")
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("operation from handler: %s successfull", op),
+		"data":    data,
+	})
+}
 ```
 
-Then I can just call it using `sendError(ctx, http.StatusBadRequest, err.Error())` for example.
-
+Then on the `createOpening.go` file I do the logic to receive the request, validate all data and insert it on the database using all the functions created previously.
 ```go
 package handler
 
@@ -618,6 +632,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/isnotvinicius/gopportunities/schemas"
 )
 
 func PostOpeningHandler(ctx *gin.Context) {
@@ -630,8 +646,26 @@ func PostOpeningHandler(ctx *gin.Context) {
 	// Validate the request
 	if err := request.Validate(); err != nil {
 		logger.Errorf("validation error: %v", err.Error())
-		sendError(ctx, http.StatusBadRequest, err.Error()) // Function of the response.go file
+		sendError(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	// Maps the request values to a variable to avoid any data we don't want
+	opening := schemas.Opening{
+		Role:     request.Role,
+		Company:  request.Company,
+		Location: request.Location,
+		Remote:   *request.Remote,
+		Link:     request.Link,
+		Salary:   request.Salary,
+	}
+
+	if err := db.Create(&opening).Error; err != nil {
+		logger.Errorf("error creating opening: %v", err.Error())
+		sendError(ctx, http.StatusInternalServerError, "error while creating opening on database")
+		return
+	}
+
+	sendSuccess(ctx, "create-opening", opening)
 }
 ```
